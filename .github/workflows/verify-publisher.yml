@@ -1,0 +1,33 @@
+name: Verify publisher credential
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check secret format without revealing it
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.HORIZON_SOURCE_TOKEN }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, re
+          token = os.environ.get("PUBLISHER_TOKEN", "")
+          if not re.fullmatch(r"github_pat_[A-Za-z0-9_]+", token):
+              raise SystemExit("Publisher secret is missing or has an unexpected format")
+          print("Publisher secret format is valid; value is not displayed")
+          PY
+      - name: Authenticate against original Horizon
+        uses: actions/checkout@v4
+        with:
+          repository: 2953261168-dot/Horizon
+          ref: main
+          token: ${{ secrets.HORIZON_SOURCE_TOKEN }}
+          persist-credentials: true
+      - name: Verify push authorization without writing
+        run: |
+          git push --dry-run origin HEAD:refs/heads/horizon-credential-check
+          echo "Publisher credential authenticated and push dry-run passed; no repository content changed"
